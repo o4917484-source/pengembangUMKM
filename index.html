@@ -610,7 +610,7 @@
                                     <i class="fas fa-search"></i>
                                     <input type="text" id="pos-search" placeholder="Cari nama/barcode barang...">
                                 </div>
-                                <button type="button" class="btn-primary" onclick="openScanner('pos')"><i class="fas fa-barcode"></i> Scan</button>
+                                <button type="button" class="btn-primary" id="btn-scan-pos"><i class="fas fa-barcode"></i> Scan</button>
                             </div>
                             <div class="pos-products" id="pos-product-list"></div>
                         </div>
@@ -630,7 +630,7 @@
                                 <div style="font-size:12px; font-weight:bold; display:flex; justify-content:space-between; margin-bottom:8px;">
                                     <span>Kembalian:</span> <span id="pos-change-pay" style="color:var(--warning-color);">Rp 0</span>
                                 </div>
-                                <button type="button" class="btn-block btn-success" onclick="processPosTransaction()"><i class="fas fa-print"></i> Selesaikan & Cetak Struk</button>
+                                <button type="button" class="btn-block btn-success" id="btn-process-pos"><i class="fas fa-print"></i> Selesaikan & Cetak Struk</button>
                             </div>
                         </div>
                     </div>
@@ -692,7 +692,7 @@
                                     <label for="prod-barcode">Kode Barcode / QR (Opsional)</label>
                                     <div style="display:flex; gap:5px;">
                                         <input type="text" id="prod-barcode" placeholder="Scan atau ketik kode barcode">
-                                        <button type="button" class="btn-secondary" onclick="openScanner('admin-form')"><i class="fas fa-camera"></i></button>
+                                        <button type="button" class="btn-secondary" id="btn-scan-admin"><i class="fas fa-camera"></i></button>
                                     </div>
                                 </div>
                                 <div class="form-group">
@@ -701,7 +701,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="prod-unit-type">Tipe Satuan Harga</label>
-                                    <select id="prod-unit-type" required onchange="handleUnitTypeChange()">
+                                    <select id="prod-unit-type" required>
                                         <option value="pcs">Per Pcs / Satuan Berbiji</option>
                                         <option value="kg">Per Kilogram (Kg)</option>
                                         <option value="dus">Per 1 Dus</option>
@@ -829,7 +829,7 @@
         <div class="scanner-box">
             <h4><i class="fas fa-barcode"></i> Pindai Barcode Kamera</h4>
             <div id="qr-reader"></div>
-            <button type="button" class="btn-danger btn-block" style="margin-top:10px;" onclick="closeScanner()">Tutup Kamera</button>
+            <button type="button" class="btn-danger btn-block" id="btn-close-scanner" style="margin-top:10px;">Tutup Kamera</button>
         </div>
     </div>
 
@@ -1047,6 +1047,10 @@
             }
         };
 
+        if (document.getElementById('prod-unit-type')) {
+            document.getElementById('prod-unit-type').addEventListener('change', window.handleUnitTypeChange);
+        }
+
         // Live Jam & Tanggal
         function updateLiveDateTime() {
             const el = document.getElementById('live-datetime');
@@ -1164,12 +1168,12 @@
                         <div class="weight-selector-box">
                             <label>Pilih/Ketik Jumlah Kilo:</label>
                             <div class="weight-presets">
-                                <button type="button" onclick="setPresetWeight('${p.id}', 0.25, this)">¼ kg</button>
-                                <button type="button" onclick="setPresetWeight('${p.id}', 0.5, this)">½ kg</button>
-                                <button type="button" onclick="setPresetWeight('${p.id}', 1, this)" class="active">1 kg</button>
+                                <button type="button" class="btn-preset-weight" data-id="${p.id}" data-val="0.25">¼ kg</button>
+                                <button type="button" class="btn-preset-weight" data-id="${p.id}" data-val="0.5">½ kg</button>
+                                <button type="button" class="btn-preset-weight active" data-id="${p.id}" data-val="1">1 kg</button>
                             </div>
                             <div class="weight-custom-input">
-                                <input type="number" id="input-weight-${p.id}" value="1" min="0.05" step="0.05" oninput="calculateLivePrice('${p.id}', ${p.price})">
+                                <input type="number" id="input-weight-${p.id}" class="input-weight-field" data-id="${p.id}" data-price="${p.price}" value="1" min="0.05" step="0.05">
                                 <span>Kg</span>
                             </div>
                         </div>
@@ -1180,7 +1184,7 @@
                         <div class="digital-selector-box">
                             <label>Ketik Jumlah Nominal Uang (Rp):</label>
                             <div class="digital-custom-input">
-                                <input type="number" id="input-digital-${p.id}" placeholder="Contoh: 50000" min="1000" oninput="calculateLiveDigitalPrice('${p.id}')">
+                                <input type="number" id="input-digital-${p.id}" class="input-digital-field" data-id="${p.id}" placeholder="Contoh: 50000" min="1000">
                             </div>
                         </div>
                     `;
@@ -1201,7 +1205,7 @@
                         ${htmlWeightControl}
                     </div>
                     <div class="product-action">
-                        <button class="btn-block btn-primary" onclick="handleBuyClick('${p.id}')" ${!isAvailable ? 'disabled' : ''}>
+                        <button class="btn-block btn-primary btn-buy-now" data-id="${p.id}" ${!isAvailable ? 'disabled' : ''}>
                             <i class="fas fa-shopping-cart"></i> ${isAvailable ? 'Beli / Masuk Keranjang' : 'Stok Habis'}
                         </button>
                     </div>
@@ -1209,6 +1213,37 @@
                 fragment.appendChild(card);
             });
             listContainer.appendChild(fragment);
+
+            // Bind events untuk preset dan input kg/digital
+            document.querySelectorAll('.btn-preset-weight').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const pid = e.target.getAttribute('data-id');
+                    const val = e.target.getAttribute('data-val');
+                    window.setPresetWeight(pid, val, e.target);
+                });
+            });
+
+            document.querySelectorAll('.input-weight-field').forEach(inp => {
+                inp.addEventListener('input', (e) => {
+                    const pid = e.target.getAttribute('data-id');
+                    const price = parseFloat(e.target.getAttribute('data-price'));
+                    window.calculateLivePrice(pid, price);
+                });
+            });
+
+            document.querySelectorAll('.input-digital-field').forEach(inp => {
+                inp.addEventListener('input', (e) => {
+                    const pid = e.target.getAttribute('data-id');
+                    window.calculateLiveDigitalPrice(pid);
+                });
+            });
+
+            document.querySelectorAll('.btn-buy-now').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const pid = e.target.closest('button').getAttribute('data-id');
+                    window.handleBuyClick(pid);
+                });
+            });
         }
 
         if (document.getElementById('search-buyer')) document.getElementById('search-buyer').addEventListener('input', renderBuyerProducts);
@@ -1223,7 +1258,7 @@
                 buttonEl.classList.add('active');
 
                 const prod = window.products.find(p => p.id == prodId);
-                if (prod) calculateLivePrice(prodId, prod.price);
+                if (prod) window.calculateLivePrice(prodId, prod.price);
             }
         };
 
@@ -1337,19 +1372,42 @@
                         <h4>${item.product.name || 'Produk'}</h4>
                         <p style="color:var(--text-muted); font-size:11px;">Satuan: ${(item.unitChosen || 'pcs').toUpperCase()}</p>
                         <div class="cart-qty-controls">
-                            ${isDigital ? '' : `<button type="button" onclick="changeCartQty(${index}, -${stepChange})">-</button>`}
+                            ${isDigital ? '' : `<button type="button" class="btn-cart-qty-minus" data-idx="${index}" data-step="${stepChange}">-</button>`}
                             <span style="font-weight:bold; color:var(--primary-color); font-size:12px;">${displayQty}</span>
-                            ${isDigital ? '' : `<button type="button" onclick="changeCartQty(${index}, ${stepChange})">+</button>`}
+                            ${isDigital ? '' : `<button type="button" class="btn-cart-qty-plus" data-idx="${index}" data-step="${stepChange}">+</button>`}
                         </div>
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                         <div style="font-weight:bold; color:var(--warning-color); font-size:13px;">Rp ${itemCost.toLocaleString('id-ID')}</div>
-                        <button type="button" class="btn-danger" style="padding:4px 8px;font-size:10px;" onclick="removeCartItem(${index})"><i class="fas fa-trash"></i> Hapus</button>
+                        <button type="button" class="btn-danger btn-cart-remove" style="padding:4px 8px;font-size:10px;" data-idx="${index}"><i class="fas fa-trash"></i> Hapus</button>
                     </div>
                 `;
                 fragment.appendChild(row);
             });
             listElement.appendChild(fragment);
+
+            document.querySelectorAll('.btn-cart-qty-minus').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    const step = parseFloat(e.target.getAttribute('data-step'));
+                    window.changeCartQty(idx, -step);
+                });
+            });
+
+            document.querySelectorAll('.btn-cart-qty-plus').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    const step = parseFloat(e.target.getAttribute('data-step'));
+                    window.changeCartQty(idx, step);
+                });
+            });
+
+            document.querySelectorAll('.btn-cart-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.closest('button').getAttribute('data-idx'));
+                    window.removeCartItem(idx);
+                });
+            });
 
             document.getElementById('summary-subtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
             document.getElementById('summary-total').innerText = `Rp ${subtotal.toLocaleString('id-ID')} (+ Ongkir Manual)`;
@@ -1569,7 +1627,7 @@
             availableProds.forEach(p => {
                 const item = document.createElement('div');
                 item.className = 'pos-item-card';
-                item.onclick = () => addToPosCart(p);
+                item.onclick = () => window.addToPosCart(p);
                 item.innerHTML = `
                     <img src="${p.img}" alt="${p.name}" loading="lazy">
                     <h5>${p.name}</h5>
@@ -1603,7 +1661,7 @@
             if (window.posCart.length === 0) {
                 container.innerHTML = `<p style="font-size:11px; text-align:center; color:var(--text-muted);">Belum ada barang dipilih</p>`;
                 document.getElementById('pos-total-pay').innerText = "Rp 0";
-                calculatePosChange();
+                window.calculatePosChange();
                 return;
             }
 
@@ -1620,16 +1678,30 @@
                         Rp ${item.product.price.toLocaleString('id-ID')} x ${item.qty}
                     </div>
                     <div>
-                        <button style="padding:1px 5px; font-size:9px;" onclick="changePosQty(${idx}, -1)">-</button>
-                        <button style="padding:1px 5px; font-size:9px;" onclick="changePosQty(${idx}, 1)">+</button>
+                        <button style="padding:1px 5px; font-size:9px;" class="btn-pos-qty-minus" data-idx="${idx}">-</button>
+                        <button style="padding:1px 5px; font-size:9px;" class="btn-pos-qty-plus" data-idx="${idx}">+</button>
                     </div>
                 `;
                 fragment.appendChild(row);
             });
             container.appendChild(fragment);
 
+            document.querySelectorAll('.btn-pos-qty-minus').forEach(b => {
+                b.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    window.changePosQty(idx, -1);
+                });
+            });
+
+            document.querySelectorAll('.btn-pos-qty-plus').forEach(b => {
+                b.addEventListener('click', (e) => {
+                    const idx = parseInt(e.target.getAttribute('data-idx'));
+                    window.changePosQty(idx, 1);
+                });
+            });
+
             document.getElementById('pos-total-pay').innerText = `Rp ${total.toLocaleString('id-ID')}`;
-            calculatePosChange();
+            window.calculatePosChange();
         }
 
         window.changePosQty = function(idx, delta) {
@@ -1710,7 +1782,7 @@
             const orderData = {
                 id: 'ord_' + Date.now(),
                 timestamp: timestampStr,
-                buyerName: `Pelanggan Toko (Kasir: ${window.currentLoggedInAdmin.username})`,
+                buyerName: `Pelanggan Toko (Kasir: ${window.currentLoggedInAdmin ? window.currentLoggedInAdmin.username : 'Kasir'})`,
                 buyerPhone: "-",
                 buyerAddress: "Transaksi Langsung Toko Physical",
                 timeOption: "Selesai di Tempat",
@@ -1734,7 +1806,7 @@
                 <div style="width:100%; text-align:center; font-size:11px;">Jl. Raya UMKM No. 1 - Indonesia</div>
                 <div style="width:100%; text-align:center; font-size:11px;">================================</div>
                 <div style="font-size:11px;">Waktu : ${timestampStr}</div>
-                <div style="font-size:11px;">Kasir : ${window.currentLoggedInAdmin.username}</div>
+                <div style="font-size:11px;">Kasir : ${window.currentLoggedInAdmin ? window.currentLoggedInAdmin.username : 'Kasir'}</div>
                 <div style="width:100%; text-align:center; font-size:11px;">--------------------------------</div>
                 <div style="font-size:11px; white-space:pre-wrap;">${summary}</div>
                 <div style="width:100%; text-align:center; font-size:11px;">--------------------------------</div>
@@ -1764,6 +1836,10 @@
                 alert("Transaksi Kasir Sukses Disimpan & Stok Dikurangi!");
             }, 300);
         };
+
+        if (document.getElementById('btn-process-pos')) {
+            document.getElementById('btn-process-pos').addEventListener('click', window.processPosTransaction);
+        }
 
         // ================= KAMERA BARCODE SCANNER LOGIC =================
         window.openScanner = function(target) {
@@ -1808,6 +1884,10 @@
             }
         };
 
+        if (document.getElementById('btn-scan-pos')) document.getElementById('btn-scan-pos').addEventListener('click', () => window.openScanner('pos'));
+        if (document.getElementById('btn-scan-admin')) document.getElementById('btn-scan-admin').addEventListener('click', () => window.openScanner('admin-form'));
+        if (document.getElementById('btn-close-scanner')) document.getElementById('btn-close-scanner').addEventListener('click', window.closeScanner);
+
         // ================= LAPORAN KEUANGAN =================
         function calculateFinancialStats(historyList) {
             let totalRevenue = 0;
@@ -1836,9 +1916,16 @@
                 tr.innerHTML = `
                     <td><strong>${u.username}</strong></td>
                     <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 5px; border-radius:4px; font-weight:bold;">${(u.role || 'admin').toUpperCase()}</span></td>
-                    <td><button class="btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteAdminUser('${u.username}')">Hapus</button></td>
+                    <td><button class="btn-danger btn-delete-user" style="padding:2px 6px; font-size:10px;" data-username="${u.username}">Hapus</button></td>
                 `;
                 tbody.appendChild(tr);
+            });
+
+            document.querySelectorAll('.btn-delete-user').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const uname = e.target.getAttribute('data-username');
+                    window.deleteAdminUser(uname);
+                });
             });
         }
 
@@ -1897,12 +1984,19 @@
                     <td>${b.time}</td>
                     <td>${b.text}</td>
                     <td>
-                        <button class="btn-danger" style="padding: 3px 8px; font-size: 10px;" onclick="deleteBroadcastHistory('${b.id}')">
+                        <button class="btn-danger btn-delete-bc" style="padding: 3px 8px; font-size: 10px;" data-id="${b.id}">
                             <i class="fas fa-trash"></i> Hapus
                         </button>
                     </td>
                 `;
                 tbody.appendChild(tr);
+            });
+
+            document.querySelectorAll('.btn-delete-bc').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.closest('button').getAttribute('data-id');
+                    window.deleteBroadcastHistory(id);
+                });
             });
         }
 
@@ -1946,21 +2040,44 @@
                     </td>
                     <td class="detail-cell"><pre style="font-size:11px; font-family:inherit; white-space:pre-wrap;">${order.itemsSummary}Waktu Kirim: ${order.timeOption}\nCatatan: ${order.note}</pre></td>
                     <td>
-                        <input type="number" value="${order.shippingFee || 0}" style="width:75px; padding:3px; font-size:11px;" onchange="updateManualShipping('${order.id}', this.value)">
+                        <input type="number" class="input-manual-shipping" data-id="${order.id}" value="${order.shippingFee || 0}" style="width:75px; padding:3px; font-size:11px;">
                     </td>
                     <td><strong>Rp ${totalTagihan.toLocaleString('id-ID')}</strong></td>
                     <td style="color:var(--success-color); font-weight:bold;">Rp ${profitNet.toLocaleString('id-ID')}</td>
                     <td>
                         <div class="btn-actions-group">
-                            <button class="btn-primary" style="background:#0284c7" onclick="sendStatusWa('${order.id}', 'received')"><i class="fab fa-whatsapp"></i> Pesanan diterima</button>
-                            <button class="btn-primary" style="background:#d97706" onclick="sendStatusWa('${order.id}', 'process')"><i class="fab fa-whatsapp"></i> Sedang diproses</button>
-                            <button class="btn-whatsapp" onclick="sendStatusWa('${order.id}', 'delivering')"><i class="fab fa-whatsapp"></i> Sedang diantar</button>
-                            <button class="btn-success" onclick="sendStatusWa('${order.id}', 'completed')"><i class="fab fa-whatsapp"></i> Selesai & Terima Kasih</button>
-                            ${isAdmin ? `<button class="btn-danger" onclick="deleteOrderHistory('${order.id}')"><i class="fas fa-trash-alt"></i> Hapus Histori</button>` : ''}
+                            <button class="btn-primary btn-status-wa" style="background:#0284c7" data-id="${order.id}" data-status="received"><i class="fab fa-whatsapp"></i> Pesanan diterima</button>
+                            <button class="btn-primary btn-status-wa" style="background:#d97706" data-id="${order.id}" data-status="process"><i class="fab fa-whatsapp"></i> Sedang diproses</button>
+                            <button class="btn-whatsapp btn-status-wa" data-id="${order.id}" data-status="delivering"><i class="fab fa-whatsapp"></i> Sedang diantar</button>
+                            <button class="btn-success btn-status-wa" data-id="${order.id}" data-status="completed"><i class="fab fa-whatsapp"></i> Selesai & Terima Kasih</button>
+                            ${isAdmin ? `<button class="btn-danger btn-delete-order" data-id="${order.id}"><i class="fas fa-trash-alt"></i> Hapus Histori</button>` : ''}
                         </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
+            });
+
+            document.querySelectorAll('.input-manual-shipping').forEach(inp => {
+                inp.addEventListener('change', (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    window.updateManualShipping(id, e.target.value);
+                });
+            });
+
+            document.querySelectorAll('.btn-status-wa').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const target = e.target.closest('button');
+                    const id = target.getAttribute('data-id');
+                    const status = target.getAttribute('data-status');
+                    window.sendStatusWa(id, status);
+                });
+            });
+
+            document.querySelectorAll('.btn-delete-order').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.closest('button').getAttribute('data-id');
+                    window.deleteOrderHistory(id);
+                });
             });
         }
 
@@ -1987,71 +2104,58 @@
         };
 
         window.sendStatusWa = function(id, statusType) {
-    const order = window.globalHistoryList.find(o => o.id === id);
-    if (!order) return;
-    
-    let msg = "";
-    let newStatus = 'active';
-    
-    // Perhitungan Keuangan
-    const subtotalBarang = order.subtotal || 0;
-    const ongkir = parseInt(order.shippingFee) || 0;
-    const totalTagihan = subtotalBarang + ongkir;
+            const order = window.globalHistoryList.find(o => o.id === id);
+            if (!order) return;
+            
+            let msg = "";
+            let newStatus = 'active';
+            
+            const subtotalBarang = order.subtotal || 0;
+            const ongkir = parseInt(order.shippingFee) || 0;
+            const totalTagihan = subtotalBarang + ongkir;
 
-    let phoneClean = order.buyerPhone.startsWith('0') ? '62' + order.buyerPhone.slice(1) : order.buyerPhone;
+            let phoneClean = order.buyerPhone.startsWith('0') ? '62' + order.buyerPhone.slice(1) : order.buyerPhone;
 
-    if (statusType === 'received') {
-        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\nPesanan Anda telah *diterima* oleh sistem kami. Terima kasih! 😊`;
-        newStatus = 'active';
+            if (statusType === 'received') {
+                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\nPesanan Anda telah *diterima* oleh sistem kami. Terima kasih! 😊`;
+                newStatus = 'active';
 
-    } else if (statusType === 'process') {
-        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Mohon tunggu, pesanan sedang diproses* oleh tim kami ya. 🙏✨`;
-        newStatus = 'active';
+            } else if (statusType === 'process') {
+                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Mohon tunggu, pesanan sedang diproses* oleh tim kami ya. 🙏✨`;
+                newStatus = 'active';
 
-    } else if (statusType === 'delivering') {
-        // PERBAIKAN RINCIAN PESANAN LENGKAP SAAT DILAKUKAN PENGIRIMAN
-        msg = `*INFO TOKO A'DIDIN*\n` +
-              `===========================\n` +
-              `Halo Kak *${order.buyerName}*,\n` +
-              `*Pesanan Anda sedang diantar!* 🛵💨\n\n` +
-              `*Rincian Belanjaan:*\n` +
-              `${order.itemsSummary}` +
-              `---------------------------\n` +
-              `• Subtotal Barang : Rp ${subtotalBarang.toLocaleString('id-ID')}\n` +
-              `• Ongkos Kirim    : Rp ${ongkir.toLocaleString('id-ID')}\n` +
-              `---------------------------\n` +
-              `*TOTAL PEMBAYARAN : Rp ${totalTagihan.toLocaleString('id-ID')}*\n\n` +
-              `💵 *Mohon siapkan uang tunai pas/sesuai nominal saat kurir tiba.* Terima kasih! 🙏✨`;
-        
-        newStatus = 'active';
+            } else if (statusType === 'delivering') {
+                msg = `*INFO TOKO A'DIDIN*\n` +
+                      `===========================\n` +
+                      `Halo Kak *${order.buyerName}*,\n` +
+                      `*Pesanan Anda sedang diantar!* 🛵💨\n\n` +
+                      `*Rincian Belanjaan:*\n` +
+                      `${order.itemsSummary}` +
+                      `---------------------------\n` +
+                      `• Subtotal Barang : Rp ${subtotalBarang.toLocaleString('id-ID')}\n` +
+                      `• Ongkos Kirim    : Rp ${ongkir.toLocaleString('id-ID')}\n` +
+                      `---------------------------\n` +
+                      `*TOTAL PEMBAYARAN : Rp ${totalTagihan.toLocaleString('id-ID')}*\n\n` +
+                      `💵 *Mohon siapkan uang tunai pas/sesuai nominal saat kurir tiba.* Terima kasih! 🙏✨`;
+                
+                newStatus = 'active';
 
-    } else if (statusType === 'completed') {
-        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan selesai, terima kasih* banyak telah berbelanja di toko kami! 🙏✨\n\n⚠️ *Catatan Sistem:* Toko kami berkomitmen memajukan UMKM Lokal secara sehat, mohon maaf *TIDAK MENERIMA / TIDAK BOLEH HUTANG*. Sampai jumpa di pesanan berikutnya!`;
-        newStatus = 'completed';
+            } else if (statusType === 'completed') {
+                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan selesai, terima kasih* banyak telah berbelanja di toko kami! 🙏✨\n\n⚠️ *Catatan Sistem:* Toko kami berkomitmen memajukan UMKM Lokal secara sehat, mohon maaf *TIDAK MENERIMA / TIDAK BOLEH HUTANG*. Sampai jumpa di pesanan berikutnya!`;
+                newStatus = 'completed';
 
-        if (order.orderStatus !== 'completed' && order.itemsList) {
-            order.itemsList.forEach(i => {
-                const prodIndex = window.products.findIndex(p => p.id === i.productId);
-                if (prodIndex !== -1 && window.products[prodIndex].unitType !== 'digital') {
-                    const newStock = Math.max(0, window.products[prodIndex].stock - i.qty);
-                    window.products[prodIndex].stock = newStock;
-                    window.products[prodIndex].available = newStock > 0;
+                if (order.orderStatus !== 'completed' && order.itemsList) {
+                    order.itemsList.forEach(i => {
+                        const prodIndex = window.products.findIndex(p => p.id === i.productId);
+                        if (prodIndex !== -1 && window.products[prodIndex].unitType !== 'digital') {
+                            const newStock = Math.max(0, window.products[prodIndex].stock - i.qty);
+                            window.products[prodIndex].stock = newStock;
+                            window.products[prodIndex].available = newStock > 0;
+                        }
+                    });
+                    window.saveProducts();
                 }
-            });
-            window.saveProducts();
-        }
-    }
-
-    order.orderStatus = newStatus;
-    window.saveHistory();
-
-    if (phoneClean && phoneClean !== "-") {
-        window.open(`https://api.whatsapp.com/send?phone=${phoneClean}&text=${encodeURIComponent(msg)}`, '_blank');
-    } else {
-        alert("Status diperbarui.");
-    }
-};
-
+            }
 
             order.orderStatus = newStatus;
             window.saveHistory();
@@ -2168,17 +2272,40 @@
                     <td><span class="badge-stock ${isStockAvail && p.available ? 'in' : 'out'}">${isStockAvail && p.available ? 'Tersedia' : 'Kosong'}</span></td>
                     <td>
                         <div class="btn-actions-group" style="min-width: 130px;">
-                            ${!isKasir ? `<button class="btn-secondary" onclick="editProduct('${p.id}')"><i class="fas fa-edit"></i> Edit</button>` : ''}
-                            <button class="${p.available ? 'btn-danger' : 'btn-success'}" onclick="toggleStock('${p.id}', ${p.available})">
+                            ${!isKasir ? `<button class="btn-secondary btn-edit-prod" data-id="${p.id}"><i class="fas fa-edit"></i> Edit</button>` : ''}
+                            <button class="${p.available ? 'btn-danger' : 'btn-success'} btn-toggle-stock" data-id="${p.id}" data-status="${p.available}">
                                 ${p.available ? 'Set Kosong' : 'Set Ada'}
                             </button>
-                            ${!isKasir ? `<button class="btn-danger" style="background:#451a03" onclick="deleteProduct('${p.id}')"><i class="fas fa-trash-alt"></i> Hapus</button>` : ''}
+                            ${!isKasir ? `<button class="btn-danger btn-delete-prod" style="background:#451a03" data-id="${p.id}"><i class="fas fa-trash-alt"></i> Hapus</button>` : ''}
                         </div>
                     </td>
                 `;
                 fragment.appendChild(tr);
             });
             tbody.appendChild(fragment);
+
+            document.querySelectorAll('.btn-edit-prod').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.closest('button').getAttribute('data-id');
+                    window.editProduct(id);
+                });
+            });
+
+            document.querySelectorAll('.btn-toggle-stock').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const target = e.target.closest('button');
+                    const id = target.getAttribute('data-id');
+                    const status = target.getAttribute('data-status') === 'true';
+                    window.toggleStock(id, status);
+                });
+            });
+
+            document.querySelectorAll('.btn-delete-prod').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.closest('button').getAttribute('data-id');
+                    window.deleteProduct(id);
+                });
+            });
         }
 
         if (document.getElementById('search-admin')) document.getElementById('search-admin').addEventListener('input', renderAdminProductTable);
@@ -2231,4 +2358,4 @@
         switchPage('buyer');
     </script>
 </body>
-    </html>
+</html>
