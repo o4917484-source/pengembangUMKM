@@ -373,6 +373,22 @@
         .order-status-badge.completed { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
         .row-order-completed { opacity: 0.7; background: #fafaf9; }
 
+        /* ==== FITUR BARU: PENANDA PESANAN ONLINE ==== */
+        .badge-online {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e40af;
+            font-size: 9px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #93c5fd;
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+        .row-online td { background-color: #f0f9ff; }
+        /* ========================================== */
+
         .btn-actions-group { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
         .btn-actions-group button {
             padding: 5px 8px; font-size: 10px; text-align: left;
@@ -823,7 +839,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-        // ================= KONFIGURASI FIREBASE & CONSTANTS =================
+        // ================= KONFIGURASI FIREBASE =================
         const firebaseConfig = {
             apiKey: "AIzaSyAp1zgBEKOFcEY1gfwtqXXTQ-wz1i7NZoI",
             authDomain: "pengembangumkm.firebaseapp.com",
@@ -1163,7 +1179,6 @@
             const searchVal = ($('search-buyer').value || '').toLowerCase();
             const filterCat = $('category-filter').value || 'all';
 
-            // Build kategori hanya jika berubah
             const categories = ['all', ...new Set(state.products.map(p => p.category))];
             const catSelect = $('category-filter');
             if (catSelect.dataset.cats !== categories.join('|')) {
@@ -1266,7 +1281,6 @@
             }).join('');
         }
 
-        // Event delegation produk (jauh lebih ringan)
         $('product-list').addEventListener('click', (e) => {
             const presetBtn = e.target.closest('.btn-preset-weight');
             if (presetBtn) {
@@ -1287,7 +1301,6 @@
             }
         });
 
-        // Search buyer + debounce
         $('search-buyer').addEventListener('input', debounce(renderBuyerProducts, 250));
         $('category-filter').addEventListener('change', renderBuyerProducts);
 
@@ -1421,7 +1434,6 @@
             $('summary-total').innerText = `Rp ${subtotal.toLocaleString('id-ID')} (+ Ongkir Manual)`;
         }
 
-        // Delegasi event keranjang
         $('cart-items-list').addEventListener('click', (e) => {
             const minus = e.target.closest('.btn-cart-qty-minus');
             if (minus) { changeCartQty(parseInt(minus.dataset.idx), -parseFloat(minus.dataset.step)); return; }
@@ -1469,7 +1481,6 @@
             e.preventDefault();
             if (state.cart.length === 0) { alert("Keranjang belanja kosong!"); return; }
 
-            // Validasi stok terakhir
             for (const item of state.cart) {
                 if (item.product.unitType !== 'digital' && getCartQty(item.product.id) > item.product.stock) {
                     alert(`Stok tidak mencukupi untuk: ${item.product.name}. Silakan kurangi jumlahnya.`);
@@ -1659,7 +1670,6 @@
 
         $('pos-cash-input').addEventListener('input', calculatePosChange);
 
-        // ================= PROSES TRANSAKSI POS (FIX BUG STOK) =================
         function processPosTransaction() {
             if (state.posCart.length === 0) {
                 alert("Kasir POS belum memilih item!");
@@ -1695,7 +1705,6 @@
 
             if (!confirm(`Total: Rp ${total.toLocaleString('id-ID')}\nBayar: Rp ${cash.toLocaleString('id-ID')}\n\nProses transaksi dan cetak struk?`)) return;
 
-            // Potong stok HANYA setelah validasi & konfirmasi
             state.posCart.forEach(i => {
                 if (i.product.unitType !== 'digital') {
                     const prodIndex = state.products.findIndex(p => p.id === i.product.id);
@@ -1770,7 +1779,7 @@
 
         $('btn-process-pos').addEventListener('click', processPosTransaction);
 
-        // ================= SCANNER BARCODE (FIX BUG RESTART) =================
+        // ================= SCANNER BARCODE =================
         function startScanner() {
             const config = { fps: 10, qrbox: { width: 250, height: 150 } };
             state.scanner.start({ facingMode: "environment" }, config, onScanSuccess)
@@ -1887,7 +1896,6 @@
             }
         }
 
-        // --- TEMA ---
         $('theme-config-form').addEventListener('submit', (e) => {
             e.preventDefault();
             state.theme = { bg: $('theme-bg-color').value, primary: $('theme-primary-color').value };
@@ -1896,7 +1904,6 @@
             alert("Warna tema berhasil diubah!");
         });
 
-        // --- BROADCAST ---
         $('wa-broadcast-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const msg = $('broadcast-text').value;
@@ -1952,7 +1959,7 @@
             }
         }
 
-        // --- HISTORI PESANAN ---
+        // ================= HISTORI PESANAN (DENGAN FITUR PENANDA ONLINE) =================
         function renderAdminHistoryTable() {
             const tbody = $('admin-history-table');
             if (!tbody) return;
@@ -1969,14 +1976,18 @@
                 const isCompleted = order.orderStatus === 'completed';
                 const profitNet = order.netProfit ?? ((order.subtotal || 0) - (order.totalHpp || 0));
 
+                // Cari tahu apakah pesanan ini berasal dari online shop
+                const isOnline = order.source === 'Online Shop';
+
                 const shippingCell = isAdmin
                     ? `<input type="number" class="input-manual-shipping" data-id="${order.id}" value="${order.shippingFee || 0}" style="width:75px; padding:3px; font-size:11px;">`
                     : `<span>Rp ${(order.shippingFee || 0).toLocaleString('id-ID')}</span>`;
 
                 return `
-                    <tr class="${isCompleted ? 'row-order-completed' : ''}">
+                    <tr class="${isCompleted ? 'row-order-completed' : ''} ${isOnline ? 'row-online' : ''}">
                         <td>${order.timestamp}<br><span style="font-size:9px; color:var(--primary-color);">[${order.source || 'Online'}]</span></td>
                         <td>
+                            ${isOnline ? '<span class="badge-online"><i class="fas fa-globe"></i> ONLINE</span><br>' : ''}
                             <span class="order-status-badge ${isCompleted ? 'completed' : 'active'}">${isCompleted ? '● Pesanan Selesai' : '● Pesanan Aktif'}</span><br>
                             <strong>${order.buyerName}</strong><br>
                             WA: ${order.buyerPhone}<br>
@@ -2059,7 +2070,6 @@
                 msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan selesai, terima kasih* banyak telah berbelanja di toko kami! 🙏✨\n\n⚠️ *Catatan Sistem:* Toko kami berkomitmen memajukan UMKM Lokal secara sehat, mohon maaf *TIDAK MENERIMA / TIDAK BOLEH HUTANG*. Sampai jumpa di pesanan berikutnya!`;
                 newStatus = 'completed';
 
-                // Potong stok hanya sekali
                 if (order.orderStatus !== 'completed' && order.itemsList) {
                     order.itemsList.forEach(i => {
                         const prodIndex = state.products.findIndex(p => p.id === i.productId);
@@ -2083,7 +2093,7 @@
             }
         }
 
-        // ================= KOMPRES GAMBAR (AGAR RINGAN) =================
+        // ================= KOMPRES GAMBAR =================
         function compressImage(file, maxWidth = 400, quality = 0.65) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -2118,7 +2128,7 @@
             }
         });
 
-        // ================= FORM PRODUK (TAMBAH/EDIT) =================
+        // ================= FORM PRODUK =================
         function handleUnitTypeChange() {
             const unitType = $('prod-unit-type').value;
             const priceGroup = $('price-form-group');
