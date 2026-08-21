@@ -1987,39 +1987,71 @@
         };
 
         window.sendStatusWa = function(id, statusType) {
-            const order = window.globalHistoryList.find(o => o.id === id);
-            if (!order) return;
-            
-            let msg = "";
-            let newStatus = 'active';
-            const total = order.subtotal + (parseInt(order.shippingFee) || 0);
-            let phoneClean = order.buyerPhone.startsWith('0') ? '62' + order.buyerPhone.slice(1) : order.buyerPhone;
+    const order = window.globalHistoryList.find(o => o.id === id);
+    if (!order) return;
+    
+    let msg = "";
+    let newStatus = 'active';
+    
+    // Perhitungan Keuangan
+    const subtotalBarang = order.subtotal || 0;
+    const ongkir = parseInt(order.shippingFee) || 0;
+    const totalTagihan = subtotalBarang + ongkir;
 
-            if (statusType === 'received') {
-                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\nPesanan Anda telah *diterima* oleh sistem kami. Terima kasih! 😊`;
-                newStatus = 'active';
-            } else if (statusType === 'process') {
-                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Mohon tunggu, pesanan sedang di proses* oleh tim kami ya. 🙏✨`;
-                newStatus = 'active';
-            } else if (statusType === 'delivering') {
-                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan sedang di antar*. Total tagihan sebesar *Rp ${total.toLocaleString('id-ID')}* (*Mohon siapkan uang tunai* pas/sesuai nominal). Terima kasih! 🛵💵`;
-                newStatus = 'active';
-            } else if (statusType === 'completed') {
-                msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan selesai, terima kasih* banyak telah berbelanja di toko kami! 🙏✨\n\n⚠️ *Catatan Sistem:* Toko kami berkomitmen memajukan UMKM Lokal secara sehat, mohon maaf *TIDAK MENERIMA / TIDAK BOLEH HUTANG*. Sampai jumpa di pesanan berikutnya!`;
-                newStatus = 'completed';
+    let phoneClean = order.buyerPhone.startsWith('0') ? '62' + order.buyerPhone.slice(1) : order.buyerPhone;
 
-                if (order.orderStatus !== 'completed' && order.itemsList) {
-                    order.itemsList.forEach(i => {
-                        const prodIndex = window.products.findIndex(p => p.id === i.productId);
-                        if (prodIndex !== -1 && window.products[prodIndex].unitType !== 'digital') {
-                            const newStock = Math.max(0, window.products[prodIndex].stock - i.qty);
-                            window.products[prodIndex].stock = newStock;
-                            window.products[prodIndex].available = newStock > 0;
-                        }
-                    });
-                    window.saveProducts();
+    if (statusType === 'received') {
+        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\nPesanan Anda telah *diterima* oleh sistem kami. Terima kasih! 😊`;
+        newStatus = 'active';
+
+    } else if (statusType === 'process') {
+        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Mohon tunggu, pesanan sedang diproses* oleh tim kami ya. 🙏✨`;
+        newStatus = 'active';
+
+    } else if (statusType === 'delivering') {
+        // PERBAIKAN RINCIAN PESANAN LENGKAP SAAT DILAKUKAN PENGIRIMAN
+        msg = `*INFO TOKO A'DIDIN*\n` +
+              `===========================\n` +
+              `Halo Kak *${order.buyerName}*,\n` +
+              `*Pesanan Anda sedang diantar!* 🛵💨\n\n` +
+              `*Rincian Belanjaan:*\n` +
+              `${order.itemsSummary}` +
+              `---------------------------\n` +
+              `• Subtotal Barang : Rp ${subtotalBarang.toLocaleString('id-ID')}\n` +
+              `• Ongkos Kirim    : Rp ${ongkir.toLocaleString('id-ID')}\n` +
+              `---------------------------\n` +
+              `*TOTAL PEMBAYARAN : Rp ${totalTagihan.toLocaleString('id-ID')}*\n\n` +
+              `💵 *Mohon siapkan uang tunai pas/sesuai nominal saat kurir tiba.* Terima kasih! 🙏✨`;
+        
+        newStatus = 'active';
+
+    } else if (statusType === 'completed') {
+        msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\n*Pesanan selesai, terima kasih* banyak telah berbelanja di toko kami! 🙏✨\n\n⚠️ *Catatan Sistem:* Toko kami berkomitmen memajukan UMKM Lokal secara sehat, mohon maaf *TIDAK MENERIMA / TIDAK BOLEH HUTANG*. Sampai jumpa di pesanan berikutnya!`;
+        newStatus = 'completed';
+
+        if (order.orderStatus !== 'completed' && order.itemsList) {
+            order.itemsList.forEach(i => {
+                const prodIndex = window.products.findIndex(p => p.id === i.productId);
+                if (prodIndex !== -1 && window.products[prodIndex].unitType !== 'digital') {
+                    const newStock = Math.max(0, window.products[prodIndex].stock - i.qty);
+                    window.products[prodIndex].stock = newStock;
+                    window.products[prodIndex].available = newStock > 0;
                 }
-            }
+            });
+            window.saveProducts();
+        }
+    }
+
+    order.orderStatus = newStatus;
+    window.saveHistory();
+
+    if (phoneClean && phoneClean !== "-") {
+        window.open(`https://api.whatsapp.com/send?phone=${phoneClean}&text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+        alert("Status diperbarui.");
+    }
+};
+
 
             order.orderStatus = newStatus;
             window.saveHistory();
