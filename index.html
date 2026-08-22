@@ -785,8 +785,11 @@
 
         onValue(ref(db, 'history'), (snapshot) => {
             const data = snapshot.val();
-            window.globalHistoryList = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
-            localStorage.setItem('adidin_history', JSON.stringify(window.globalHistoryList));
+            const hasData = data && (Array.isArray(data) ? data.length > 0 : Object.keys(data).length > 0);
+            if (hasData) {
+                window.globalHistoryList = Array.isArray(data) ? data : Object.values(data);
+                localStorage.setItem('adidin_history', JSON.stringify(window.globalHistoryList));
+            }
             renderAdminHistoryTable(window.globalHistoryList);
             calculateFinancialStats(window.globalHistoryList);
         });
@@ -1056,6 +1059,12 @@
                     `;
                 }
 
+                // Menampilkan topping beserta harganya
+                let toppingInfoHtml = '';
+                if (p.toppings && p.toppings.length > 0) {
+                    toppingInfoHtml = `<div class="badge-topping"><i class="fas fa-cookie-bite"></i> Toping: ${p.toppings.map(t => `${t.name} (+Rp ${(t.price || 0).toLocaleString('id-ID')})`).join(', ')}</div>`;
+                }
+
                 card.innerHTML = `
                     <div class="product-img-box">
                         <img src="${p.img}" alt="${p.name}" loading="lazy">
@@ -1064,7 +1073,7 @@
                     </div>
                     <div class="product-info">
                         <span class="product-cat">${p.category} | Stok: ${isDigital ? '∞' : p.stock}</span>
-                        ${(p.toppings && p.toppings.length > 0) ? '<div class="badge-topping"><i class="fas fa-cookie-bite"></i> Toping Tersedia</div>' : ''}
+                        ${toppingInfoHtml}
                         <h3 class="product-title">${p.name}</h3>
                         <p class="product-desc">${p.desc}</p>
                         <div class="product-price" id="main-price-box-${p.id}">${displayPriceHtml}</div>
@@ -1244,7 +1253,7 @@
                     <img src="${item.product.img || ''}" alt="${item.product.name || 'Produk'}">
                     <div class="cart-item-details">
                         <h4>${item.product.name || 'Produk'}</h4>
-                        ${topings.length ? `<div style="font-size:10px; color:var(--primary-color); margin:2px 0;">Toping: ${topingText}</div>` : ''}
+                        ${toppings.length ? `<div style="font-size:10px; color:var(--primary-color); margin:2px 0;">Toping: ${topingText}</div>` : ''}
                         <p style="color:var(--text-muted); font-size:11px;">Satuan: ${(item.unitChosen || 'pcs').toUpperCase()}</p>
                         <div class="cart-qty-controls">
                             ${isDigital ? '' : `<button type="button" class="btn-cart-qty-minus" data-idx="${index}" data-step="${stepChange}">-</button>`}
@@ -1348,7 +1357,7 @@
                 else if (item.unitChosen === 'digital') satuanLabel = 'Transaksi';
                 
                 const topingStr = toppings.map(t => `${t.name} +Rp ${(t.price || 0).toLocaleString('id-ID')}`).join(', ');
-                itemText += `${index + 1}. ${item.product.name} [Rp ${item.product.price.toLocaleString('id-ID')} x ${item.qty} ${satuanLabel}${topings.length ? ' | Toping: '+topingStr : ''}] -> Rp ${totalCost.toLocaleString('id-ID')}\n`;
+                itemText += `${index + 1}. ${item.product.name} [Rp ${item.product.price.toLocaleString('id-ID')} x ${item.qty} ${satuanLabel}${toppings.length ? ' | Toping: '+topingStr : ''}] -> Rp ${totalCost.toLocaleString('id-ID')}\n`;
 
                 orderedItemsArray.push({
                     productId: item.product.id,
@@ -2029,7 +2038,9 @@
             const ongkir = parseInt(order.shippingFee) || 0;
             const totalTagihan = subtotalBarang + ongkir;
 
-            let phoneClean = order.buyerPhone.startsWith('0') ? '62' + order.buyerPhone.slice(1) : order.buyerPhone;
+            // Perbaikan: gunakan guard untuk buyerPhone
+            const phoneNumber = (order.buyerPhone || "-").toString();
+            let phoneClean = phoneNumber.startsWith('0') ? '62' + phoneNumber.slice(1) : phoneNumber;
 
             if (statusType === 'received') {
                 msg = `*INFO TOKO A'DIDIN*\n\nHalo Kak *${order.buyerName}*,\nPesanan Anda telah *diterima* oleh sistem kami. Terima kasih! 😊`;
